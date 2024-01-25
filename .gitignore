@@ -28,3 +28,14 @@ replay_pid*
 
 # Ignore Gradle build output directory
 build
+
+.idea
+.vscode
+.settings
+.project
+.classpath
+build/*
+*/build/*
+*/out/*
+target
+*.log

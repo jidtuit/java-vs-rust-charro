@@ -3,12 +3,73 @@
  */
 package org.jid.javavsrust;
 
+import static java.util.stream.Collectors.groupingBy;
+
+import java.io.IOException;
+import java.net.URISyntaxException;
+import java.nio.file.Files;
+import java.nio.file.Path;
+import java.util.List;
+import java.util.Map;
+import java.util.Set;
+import java.util.function.Predicate;
+import java.util.stream.Collectors;
+
 public class App {
-    public String getGreeting() {
-        return "Hello World!";
+
+
+    public static final String FILE_NAME = "Popular_Baby_Names_NYC.csv";
+    public static final String CSV_SEPARATOR = ",";
+    public static final Set<String> VALID_YEARS = Set.of("2015", "2016", "2017", "2018", "2019");
+    public static final String FEMALE_GENDER = "FEMALE";
+    public static final String RANK_1 = "1";
+
+    public static void main(String[] args) throws URISyntaxException, IOException {
+        App app = new App();
+        Path filePath = Path.of(App.class.getClassLoader().getResource(FILE_NAME).toURI());
+
+        Map<Ethnicity, List<MostPopularBabyName>> babiesByEthnicity = app.getBabiesByEthnicity(filePath);
+
+        app.print(babiesByEthnicity);
     }
 
-    public static void main(String[] args) {
-        System.out.println(new App().getGreeting());
+    private Map<Ethnicity, List<MostPopularBabyName>> getBabiesByEthnicity(Path filePath) throws IOException {
+        try(var lines = Files.lines(filePath)) {
+            return lines
+              .skip(1) // skip csv header
+              .map(line -> line.split(CSV_SEPARATOR)) // Read and split every line
+              .filter(filterFemaleRank1InRangeOfYears(VALID_YEARS)) // Filter by condition
+              .map(MostPopularBabyName::fromCsvLine) // Parse filtered lines
+              .collect(groupingBy(MostPopularBabyName::ethnicity)); // Create a map with ethnicity as key and a list of MostPopularBabyName
+        }
+    }
+
+    private Predicate<? super String[]> filterFemaleRank1InRangeOfYears(Set<String> validYears) {
+        return line -> {
+            String gender = line[1];
+            String rank = line[5];
+            String year = line[0];
+            return FEMALE_GENDER.equals(gender) && RANK_1.equals(rank) && validYears.contains(year);
+        };
+    }
+
+    private void print(Map<Ethnicity, List<MostPopularBabyName>> babiesByEthnicity) {
+        babiesByEthnicity.forEach((key, value) -> {
+            String names = value.stream().map(MostPopularBabyName::name).distinct().collect(Collectors.joining(",", "[", "]"));
+            System.out.println(key + ": " + names);
+        });
+    }
+
+
+    private enum Ethnicity {
+        ASIAN_AND_PACIFIC_ISLANDER, BLACK_NON_HISPANIC, HISPANIC, WHITE_NON_HISPANIC
+    }
+
+    private record MostPopularBabyName(String name, Ethnicity ethnicity) {
+        public static MostPopularBabyName fromCsvLine(String[] line) {
+            String name = line[3];
+            String ethnicity = line[2].replace(" ", "_");
+            return new MostPopularBabyName(name, Ethnicity.valueOf(ethnicity));
+        }
     }
 }
